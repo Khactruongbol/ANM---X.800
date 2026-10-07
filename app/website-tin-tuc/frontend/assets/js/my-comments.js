@@ -1,0 +1,432 @@
+/**
+ * ==============================================================================
+ * TÊN FILE: frontend/assets/js/my-comments.js
+ * PHÂN HỆ: Quản lý Bình luận cá nhân (User My-Comments Module)
+ * MÔ TẢ: Hiển thị và quản lý tất cả bình luận do người dùng hiện tại đã đăng:
+ *        1. Tải danh sách bình luận cá nhân từ backend/api/user/my-comments.php.
+ *        2. Render danh sách kèm ngữ cảnh bài viết (tên bài, liên kết nhảy tới vị trí bình luận).
+ *        3. Hỗ trợ menu hành động (xem chi tiết, mở modal xác nhận xóa bình luận).
+ *        4. Thực thi xóa bình luận qua phương thức DELETE tới backend/api/user/my-comments.php.
+ * PHẠM VI SỬ DỤNG:
+ *   - frontend/user/my-comments.html
+ * PHỤ THUỘC:
+ *   - frontend/assets/js/common.js (initPublicHeader, initPublicFooter, resolveApiUrl, showToast, escapeHtml, etc.)
+ *   - backend/api/user/my-comments.php
+ * ==============================================================================
+ */
+
+const COMMENTS_API = typeof resolveApiUrl === "function" ? resolveApiUrl("user/my-comments.php") : "/backend/api/user/my-comments.php";
+let activeDeleteCommentId = null;
+
+// ==============================================================================
+// KHỐI 1: KHỞI TẠO KHUNG TRANG & TẢI DANH SÁCH BÀI BÌNH LUẬN CỦA BẢN THÂN
+// ==============================================================================
+async function initMyCommentsPage() {
+  // Header
+  if (typeof initPublicHeader === "function") {
+    await initPublicHeader("my-comments");
+  }
+
+  // Footer
+  if (typeof initPublicFooter === "function") {
+    await initPublicFooter();
+  }
+
+  try {
+    const response = await fetch(COMMENTS_API, { credentials: "include" });
+    const result = await response.json();
+    if (result.success) {
+      renderMyCommentsList(result.data || []);
+    } else {
+      renderCommentsApiNotAvailable();
+    }
+  } catch (error) {
+    console.error("Lỗi tải danh sách bình luận:", error);
+    renderCommentsApiNotAvailable();
+  }
+
+  // Đóng dropdown khi click ra ngoài
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".comment-action-menu-wrap")) {
+      document
+        .querySelectorAll(".comment-action-dropdown")
+        .forEach((element) => {
+          element.style.display = "none";
+        });
+    }
+  });
+}
+
+// ==============================================================================
+// KHỐI 2: RENDER GIAO DIỆN DANH SÁCH BÌNH LUẬN & TRẠNG THÁI RỖNG
+// ==============================================================================
+function renderCommentsApiNotAvailable() {
+  const mount = document.getElementById("my-comments-mount");
+
+  if (!mount) return;
+
+  mount.innerHTML = `
+    <div
+      class="empty-state"
+      style="
+        text-align: center;
+        padding: 48px 16px;
+        color: var(--ink-soft);
+        font-size: 15px;
+      "
+    >
+      <p
+        style="
+          margin: 0;
+          font-family: var(--font-serif);
+          font-size: 17px;
+          color: var(--ink-muted);
+        "
+      >
+        Bạn chưa có bình luận nào.
+      </p>
+    </div>
+  `;
+}
+
+function renderMyCommentsList(comments) {
+  const mount = document.getElementById("my-comments-mount");
+
+  if (!mount) return;
+
+  if (!Array.isArray(comments) || comments.length === 0) {
+    mount.innerHTML = `
+      <div
+        class="empty-state"
+        style="
+          text-align: center;
+          padding: 48px 16px;
+          color: var(--ink-soft);
+          font-size: 15px;
+        "
+      >
+        <p
+          style="
+            margin: 0;
+            font-family: var(--font-serif);
+            font-size: 17px;
+            color: var(--ink-muted);
+          "
+        >
+          Bạn chưa có bình luận nào trên Mạch Tin.
+        </p>
+      </div>
+    `;
+
+    return;
+  }
+
+  mount.innerHTML = `
+    <div
+      class="my-comments-list"
+      style="
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      "
+    >
+      ${comments
+        .map((comment) => {
+          const articleTitle =
+            comment.article_title || "Bài viết không xác định";
+
+          const articleSlug = comment.article_slug || comment.article_id;
+
+          const articleUrl = `../public/article-detail.html?slug=${encodeURIComponent(
+            articleSlug,
+          )}`;
+
+          const viewCommentUrl = `${articleUrl}&comment_id=${comment.id}#comment-${comment.id}`;
+
+          const safeContent =
+            typeof escapeHtml === "function"
+              ? escapeHtml(comment.content || "")
+              : comment.content || "";
+
+          const safeArticleTitle =
+            typeof escapeHtml === "function"
+              ? escapeHtml(articleTitle)
+              : articleTitle;
+
+          return `
+          <div
+            class="my-comment-item"
+            style="
+              display: flex;
+              align-items: flex-start;
+              gap: 16px;
+              padding: 18px 0;
+              border-bottom: 1px solid var(--line-soft);
+            "
+          >
+
+            <!-- Nội dung -->
+            <div
+              class="my-comment-body"
+              style="
+                flex: 1;
+                min-width: 0;
+              "
+            >
+
+              <div
+                class="my-comment-context"
+                style="
+                  font-size: 14.5px;
+                  line-height: 1.45;
+                  color: var(--ink);
+                  margin-bottom: 6px;
+                "
+              >
+                <span style="color: var(--ink-soft);">
+                  Bạn đã bình luận về bài viết
+                </span>
+
+                <a
+                  href="${articleUrl}"
+                  class="my-comment-article-link"
+                  style="
+                    font-family: var(--font-serif);
+                    font-weight: 600;
+                    color: var(--ink);
+                    text-decoration: none;
+                  "
+                >
+                  ${safeArticleTitle}
+                </a>
+              </div>
+
+
+              <div
+                class="my-comment-content"
+                style="
+                  font-family: var(--f-body);
+                  font-size: 14px;
+                  line-height: 1.6;
+                  color: var(--ink);
+                  background: var(--white);
+                  border-radius: 4px;
+                  padding: 10px 14px;
+                  border: 1px solid var(--line-soft);
+                  border-left: 3px solid var(--brass);
+                  word-break: break-word;
+                  margin-top: 6px;
+                "
+              >
+                ${safeContent}
+              </div>
+
+            </div>
+
+
+            <!-- Actions -->
+            <div
+              class="my-comment-actions-wrap"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-shrink: 0;
+                margin-left: 8px;
+                margin-top: 2px;
+              "
+            >
+
+              <a
+                href="${viewCommentUrl}"
+                class="btn btn-sm btn-ghost my-comment-view-btn"
+                style="
+                  padding: 5px 12px;
+                  font-size: 12.5px;
+                  text-decoration: none;
+                "
+              >
+                Xem
+              </a>
+
+
+              <div
+                class="comment-action-menu-wrap"
+                style="position: relative;"
+              >
+
+                <button
+                  type="button"
+                  class="btn btn-sm btn-ghost my-comment-menu-trigger"
+                  onclick="toggleCommentActionMenu(${comment.id}, event)"
+                  aria-label="Tùy chọn bình luận"
+                  style="
+                    width: 30px;
+                    height: 30px;
+                    padding: 0;
+                  "
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <circle cx="12" cy="12" r="2"></circle>
+                    <circle cx="19" cy="12" r="2"></circle>
+                    <circle cx="5" cy="12" r="2"></circle>
+                  </svg>
+                </button>
+
+
+                <div
+                  id="comment-menu-${comment.id}"
+                  class="comment-action-dropdown"
+                  style="
+                    display: none;
+                    position: absolute;
+                    right: 0;
+                    top: 100%;
+                    margin-top: 4px;
+                    background: var(--paper);
+                    border: 1px solid var(--line-soft);
+                    border-radius: 4px;
+                    z-index: 10;
+                    min-width: 120px;
+                    padding: 4px 0;
+                  "
+                >
+
+                  <button
+                    type="button"
+                    onclick="openDeleteCommentModal(${comment.id})"
+                    style="
+                      width: 100%;
+                      text-align: left;
+                      background: none;
+                      border: none;
+                      padding: 8px 12px;
+                      cursor: pointer;
+                    "
+                  >
+                    Xóa
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+// ==============================================================================
+// KHỐI 3: THAO TÁC MENU TÙY CHỌN, MODAL VÀ XÓA BÌNH LUẬN QUA API
+// ==============================================================================
+/**
+ * Đóng / mở menu ba chấm
+ */
+function toggleCommentActionMenu(commentId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+
+  const targetMenu = document.getElementById(`comment-menu-${commentId}`);
+
+  const isAlreadyOpen = targetMenu && targetMenu.style.display === "block";
+
+  // Đóng các menu khác
+  document.querySelectorAll(".comment-action-dropdown").forEach((element) => {
+    element.style.display = "none";
+  });
+
+  // Mở menu được chọn
+  if (!isAlreadyOpen && targetMenu) {
+    targetMenu.style.display = "block";
+  }
+}
+
+/**
+ * Mở modal xóa
+ */
+function openDeleteCommentModal(commentId) {
+  document.querySelectorAll(".comment-action-dropdown").forEach((element) => {
+    element.style.display = "none";
+  });
+
+  activeDeleteCommentId = commentId;
+
+  const modal = document.getElementById("deleteCommentModal");
+
+  if (modal) {
+    modal.classList.add("is-open");
+  }
+}
+
+/**
+ * Đóng modal
+ */
+function closeDeleteCommentModal() {
+  activeDeleteCommentId = null;
+
+  const modal = document.getElementById("deleteCommentModal");
+
+  if (modal) {
+    modal.classList.remove("is-open");
+  }
+}
+
+/**
+ * DELETE bình luận bằng PHP API
+ */
+async function confirmDeleteComment() {
+  if (!activeDeleteCommentId) return;
+
+  try {
+    const response = await fetch(COMMENTS_API, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        comment_id: activeDeleteCommentId,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.message || "Xóa bình luận thất bại");
+    }
+
+    closeDeleteCommentModal();
+
+    if (typeof showToast === "function") {
+      showToast(result.message || "Xóa bình luận thành công!", "success");
+    }
+
+    initMyCommentsPage();
+  } catch (error) {
+    console.error("Lỗi xóa bình luận:", error);
+
+    closeDeleteCommentModal();
+
+    if (typeof showToast === "function") {
+      showToast(error.message || "Xóa bình luận thất bại", "error");
+    }
+  }
+}
+
+// Khởi chạy
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initMyCommentsPage);
+} else {
+  initMyCommentsPage();
+}

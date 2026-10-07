@@ -1,0 +1,451 @@
+/**
+ * ==============================================================================
+ * TÊN FILE: frontend/assets/js/search.js
+ * PHÂN HỆ: Tìm kiếm & Lọc bài viết (Public Search & Tag Discovery Module)
+ * MÔ TẢ: Khởi tạo và xử lý toàn bộ logic tìm kiếm nội dung trên trang công khai:
+ *        1. Đọc và đồng bộ tham số URL (?q=, ?tag=, ?cat=, ?sort=).
+ *        2. Tải toàn bộ dữ liệu bài viết đã xuất bản, chuyên mục và danh sách tag.
+ *        3. Lọc đa điều kiện: Tag, từ khóa tìm kiếm (bỏ dấu tiếng Việt, tìm theo tiêu đề/mô tả/nội dung), chuyên mục.
+ *        4. Sắp xếp kết quả: Mới nhất (newest), cũ nhất (oldest), lượt đọc nhiều nhất (views).
+ *        5. Highlight từ khóa tìm kiếm (thẻ <mark>) trong tiêu đề và tóm tắt kết quả.
+ *        6. Tích hợp sidebar tin đọc nhiều và danh mục hashtag thịnh hành.
+ * PHẠM VI SỬ DỤNG:
+ *   - frontend/public/search.html
+ * PHỤ THUỘC:
+ *   - frontend/assets/js/common.js (initPublicHeader, initPublicFooter, initPublicSidebar, resolveApiUrl, getArticleDetailUrl, etc.)
+ *   - backend/api/public/articles.php
+ *   - backend/api/public/categories.php
+ *   - backend/api/public/tags.php
+ * ==============================================================================
+ */
+
+async function initSearchPage() {
+  // ==============================================================================
+  // KHỐI 1: KHỞI TẠO KHUNG TRANG, ĐỌC THAM SỐ URL & TẢI DỮ LIỆU TÌM KIẾM
+  // ==============================================================================
+  // 1. Khởi tạo Header và Footer dùng chung
+  if (typeof initPublicHeader === "function") await initPublicHeader("search");
+  if (typeof initPublicFooter === "function") await initPublicFooter();
+
+  // 2. Lấy tham số URL
+  const urlParams = new URLSearchParams(window.location.search);
+  let queryParam = (urlParams.get("q") || "").trim();
+  let tagParam = (urlParams.get("tag") || "").trim();
+  let selectedCategory = urlParams.get("cat") || "all";
+  let selectedSort = urlParams.get("sort") || "newest";
+  let currentPage = parseInt(urlParams.get("page") || "1", 10);
+  if (isNaN(currentPage) || currentPage < 1) currentPage = 1;
+
+  // 3. Lấy dữ liệu bài viết, chuyên mục & thẻ tag từ backend (PHP + MySQL).
+  let tags = [];
+  let articles = [];
+  let categories = [];
+  try {
+    const [articlesRes, categoriesRes, tagsRes] = await Promise.all([
+      fetch(resolveApiUrl("public/articles.php")).then((r) => r.json()),
+      fetch(resolveApiUrl("public/categories.php")).then((r) => r.json()),
+      fetch(resolveApiUrl("public/tags.php")).then((r) => r.json()),
+    ]);
+    articles = articlesRes && articlesRes.success && Array.isArray(articlesRes.data) ? articlesRes.data : [];
+    categories = categoriesRes && categoriesRes.success && Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
+    tags = tagsRes && tagsRes.success && Array.isArray(tagsRes.data) ? tagsRes.data : [];
+  } catch (error) {
+    console.error("Lỗi khi tải dữ liệu tìm kiếm từ backend", error);
+  }
+
+  // Helper lấy tác giả (đã được API nhúng sẵn trong article.author)
+  function getAuthor(article) {
+    return (article && article.author) || { full_name: "Ban Biên Tập", id: 1 };
+  }
+
+  // DOM Elements
+  const searchForm = document.getElementById("searchForm");
+  const searchInput = document.getElementById("searchInput");
+  const searchSummaryText = document.getElementById("searchSummaryText");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const sortFilter = document.getElementById("sortFilter");
+  const searchResultsList = document.getElementById("searchResultsList");
+  const hotTagsMount = document.getElementById("hotTagsMount");
+  const breadcrumbCurrent = document.getElementById("breadcrumb-current");
+
+  // Điền sẵn từ khóa vào ô search input
+  if (searchInput) {
+    searchInput.value = queryParam;
+  }
+
+  // 4. Render các thành phần tĩnh & danh mục
+  setupCategoryOptions();
+  renderHotTags();
+
+  // Khởi tạo Sidebar chung đồng nhất (Đọc nhiều nhất trong tuần & Tag nổi bật)
+  await initPublicSidebar({
+    rankMountId: "topViewsMount",
+    tagMountId: "sidebarAllTagsMount"
+  });
+
+  // ==============================================================================
+  // KHỐI 2: LẮNG NGHE SỰ KIỆN TÌM KIẾM, LỌC CHUYÊN MỤC & SẮP XẾP
+  // ==============================================================================
+  if (categoryFilter) {
+    categoryFilter.addEventListener("change", (e) => {
+      selectedCategory = e.target.value;
+      currentPage = 1;
+      const newUrl = new URL(window.location.href);
+      if (selectedCategory !== "all") {
+        newUrl.searchParams.set("cat", selectedCategory);
+      } else {
+        newUrl.searchParams.delete("cat");
+      }
+      newUrl.searchParams.set("page", "1");
+      window.history.pushState({}, "", newUrl);
+      executeSearch();
+    });
+  }
+
+  if (sortFilter) {
+    sortFilter.addEventListener("change", (e) => {
+      selectedSort = e.target.value;
+      currentPage = 1;
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("sort", selectedSort);
+      newUrl.searchParams.set("page", "1");
+      window.history.pushState({}, "", newUrl);
+      executeSearch();
+    });
+  }
+
+  if (searchForm) {
+    searchForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (searchInput) {
+        queryParam = searchInput.value.trim();
+        currentPage = 1;
+        // Cập nhật lại URL mà không cần tải lại toàn bộ trang
+        const newUrl = new URL(window.location.href);
+        if (queryParam) {
+          newUrl.searchParams.set("q", queryParam);
+        } else {
+          newUrl.searchParams.delete("q");
+        }
+        newUrl.searchParams.set("page", "1");
+        window.history.pushState({}, "", newUrl);
+        executeSearch();
+      }
+    });
+  }
+
+  // Bắt sự kiện back/forward trên trình duyệt
+  window.addEventListener("popstate", () => {
+    const params = new URLSearchParams(window.location.search);
+    queryParam = (params.get("q") || "").trim();
+    tagParam = (params.get("tag") || "").trim();
+    selectedCategory = params.get("cat") || "all";
+    selectedSort = params.get("sort") || "newest";
+    currentPage = parseInt(params.get("page") || "1", 10) || 1;
+    if (searchInput) searchInput.value = queryParam;
+    if (categoryFilter) categoryFilter.value = selectedCategory;
+    if (sortFilter) sortFilter.value = selectedSort;
+    executeSearch();
+  });
+
+  // 6. Thực thi tìm kiếm lần đầu khi tải trang
+  executeSearch();
+
+  // ==============================================================================
+  // KHỐI 3: THUẬT TOÁN TÌM KIẾM, LỌC ĐA ĐIỀU KIỆN & SẮP XẾP BÀI VIẾT
+  // ==============================================================================
+  function executeSearch() {
+    let publishedArticles = articles.filter((a) => a.status === "published");
+
+    // A. Lọc theo Tag (nếu có tham số ?tag=...)
+    let activeTagObj = null;
+    if (tagParam) {
+      const tagLower = tagParam.toLowerCase();
+      activeTagObj = tags.find(
+        (t) =>
+          (t.slug && t.slug.toLowerCase() === tagLower) ||
+          (t.name && t.name.toLowerCase() === tagLower) ||
+          String(t.id) === tagParam
+      );
+
+      if (activeTagObj) {
+        publishedArticles = publishedArticles.filter((a) =>
+          Array.isArray(a.tags) && a.tags.some(
+            (t) => t.id === activeTagObj.id || t.slug === activeTagObj.slug
+          )
+        );
+      }
+    }
+
+    // B. Lọc theo Từ khóa tìm kiếm (?q=...)
+    if (queryParam) {
+      const qLower = removeVietnameseTones(queryParam.toLowerCase());
+
+      publishedArticles = publishedArticles.filter((a) => {
+        const titleMatch = removeVietnameseTones((a.title || "").toLowerCase()).includes(qLower);
+        const summaryMatch = removeVietnameseTones((a.short_description || "").toLowerCase()).includes(qLower);
+        const contentMatch = removeVietnameseTones((a.content || "").toLowerCase()).includes(qLower);
+        return titleMatch || summaryMatch || contentMatch;
+      });
+    }
+
+    // C. Lọc theo Chuyên mục đã chọn
+    if (selectedCategory !== "all") {
+      publishedArticles = publishedArticles.filter((a) => String(a.category_id) === String(selectedCategory));
+    }
+
+    // D. Sắp xếp kết quả
+    if (selectedSort === "views") {
+      publishedArticles.sort((a, b) => getArticleViews(b) - getArticleViews(a));
+    } else if (selectedSort === "oldest") {
+      publishedArticles.sort((a, b) => {
+        const dateA = new Date(String(a.published_at || a.created_at).replace(" ", "T")).getTime();
+        const dateB = new Date(String(b.published_at || b.created_at).replace(" ", "T")).getTime();
+        return dateA - dateB;
+      });
+    } else {
+      // Mặc định: newest (mới nhất)
+      publishedArticles.sort((a, b) => {
+        const dateA = new Date(String(a.published_at || a.created_at).replace(" ", "T")).getTime();
+        const dateB = new Date(String(b.published_at || b.created_at).replace(" ", "T")).getTime();
+        return dateB - dateA;
+      });
+    }
+
+    // E. Cập nhật Breadcrumb & Tiêu đề trang
+    if (breadcrumbCurrent) {
+      if (activeTagObj) {
+        breadcrumbCurrent.textContent = `Tag: #${activeTagObj.name}`;
+        document.title = `#${activeTagObj.name} - Mạch Tin`;
+      } else if (queryParam) {
+        breadcrumbCurrent.textContent = `Tìm kiếm: "${queryParam}"`;
+        document.title = `Tìm kiếm: ${queryParam} - Mạch Tin`;
+      } else {
+        breadcrumbCurrent.textContent = "Tìm kiếm tin tức";
+        document.title = "Tìm kiếm tin tức - Mạch Tin";
+      }
+    }
+
+    // F. Cập nhật dòng Thống kê kết quả
+    updateSummaryText(publishedArticles.length, queryParam, activeTagObj);
+
+    // G. Highlight lại các chip tag đang kích hoạt
+    highlightActiveTagChips(activeTagObj);
+
+    // H. Render danh sách bài viết kết quả
+    renderArticleCards(publishedArticles, queryParam);
+  }
+
+  // ==============================================================================
+  // KHỐI 4: RENDER DANH SÁCH KẾT QUẢ & HIGHLIGHT TỪ KHÓA TÌM KIẾM
+  // ==============================================================================
+  function renderArticleCards(list, keyword) {
+    if (!searchResultsList) return;
+    const paginationMount = document.getElementById("search-pagination-mount");
+
+    if (list.length === 0) {
+      if (paginationMount) {
+        paginationMount.style.display = "none";
+        paginationMount.innerHTML = "";
+      }
+      searchResultsList.innerHTML = `
+        <div class="search-empty-box">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+          <h3 class="headline-md" style="margin: 0 0 8px; font-size: 18px;">Không tìm thấy bài viết nào phù hợp</h3>
+          <p class="meta" style="font-size: 13.5px; margin: 0;">
+            ${keyword ? `Không có kết quả cho từ khóa "<strong>${escapeHtml(keyword)}</strong>"` : "Không có bài viết nào phù hợp với bộ lọc hiện tại."}
+          </p>
+
+          <div class="search-empty-tips">
+            <strong>Gợi ý tìm kiếm:</strong>
+            <ul>
+              <li>Kiểm tra lại lỗi chính tả của các từ khóa.</li>
+              <li>Thử sử dụng từ khóa ngắn hơn hoặc phổ biến hơn.</li>
+              <li>Bấm vào các #TAG để tìm kiếm nhanh.</li>
+              <li>Chọn lại bộ lọc <em>"Tất cả chuyên mục"</em>.</li>
+            </ul>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Phân trang kết quả tìm kiếm (8 bài viết / trang)
+    const PAGE_SIZE = 8;
+    const totalItems = list.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = list.slice(startIndex, startIndex + PAGE_SIZE);
+
+    searchResultsList.innerHTML = pageItems
+      .map((article) => {
+        const cat = categories.find((c) => c.id === article.category_id) || { name: "Tin tức", slug: "tin-tuc" };
+        const author = getAuthor(article);
+        const safeDate = typeof formatDate === "function" ? formatDate(article.published_at || article.created_at) : article.published_at || "";
+        const safeViews = getArticleViews(article).toLocaleString("vi-VN");
+
+        // Highlight từ khóa trong Tiêu đề và Tóm tắt nếu có từ khóa
+        const rawTitle = article.title || "";
+        const rawSummary = article.short_description || "";
+        const highlightedTitle = highlightKeyword(rawTitle, keyword);
+        const highlightedSummary = highlightKeyword(rawSummary, keyword);
+
+        // Lấy danh sách tag của bài viết này
+        const thisTags = Array.isArray(article.tags) ? article.tags : [];
+        const tagsHtml = thisTags.length > 0
+          ? `<div class="search-article-card__tags">
+              ${thisTags.map((t) => `<a href="search.html?tag=${t.slug}" class="tag-chip" style="font-size: 11.5px; padding: 2px 7px;">#${escapeHtml(t.name)}</a>`).join("")}
+            </div>`
+          : "";
+
+        const coverHtml = typeof renderCoverImage === "function"
+          ? renderCoverImage(article.cover_image, article.title, "ph--16x9")
+          : `<div class="ph ph--16x9"><img src="${article.cover_image || ''}" alt="${escapeHtml(article.title)}"></div>`;
+
+        return `
+          <article class="search-article-card">
+            <a href="${getArticleDetailUrl(article)}" class="search-article-card__thumb" aria-label="${escapeHtml(article.title)}">
+              ${coverHtml}
+            </a>
+            <div class="search-article-card__body">
+              <div>
+                <a href="category.html?slug=${cat.slug}" class="eyebrow">${escapeHtml(cat.name)}</a>
+                <h3 class="search-article-card__title">
+                  <a href="${getArticleDetailUrl(article)}">
+                    ${highlightedTitle}
+                  </a>
+                </h3>
+                <p class="search-article-card__dek">
+                  ${highlightedSummary}
+                </p>
+                ${tagsHtml}
+              </div>
+              <div class="search-article-card__meta">
+                <a href="${typeof getAuthorProfileUrl === 'function' ? getAuthorProfileUrl(author) : 'author.html?username=' + encodeURIComponent(author.username || author.id)}">${escapeHtml(author.full_name)}</a>
+                <span class="dot-sep">·</span>
+                <span>${safeDate}</span>
+                <span class="dot-sep">·</span>
+                <span>${safeViews} lượt đọc</span>
+              </div>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
+
+    // Render thanh phân trang số dùng chung
+    if (typeof renderPublicPagination === "function") {
+      renderPublicPagination("search-pagination-mount", {
+        currentPage,
+        totalPages,
+        totalRecords: totalItems,
+        scrollTarget: "#searchSummaryText",
+        onPageChange: (newPage) => {
+          currentPage = newPage;
+          const u = new URL(window.location.href);
+          u.searchParams.set("page", String(newPage));
+          window.history.pushState({}, "", u);
+          executeSearch();
+        }
+      });
+    }
+  }
+
+  // ==============================================================================
+  // KHỐI 5: CÁC HÀM TIỆN ÍCH HỖ TRỢ TÌM KIẾM (XỬ LÝ DẤU, REGEX & DOM OPTIONS)
+  // ==============================================================================
+  function highlightKeyword(text, keyword) {
+    if (!text) return "";
+    if (!keyword) return escapeHtml(text);
+
+    try {
+      const escapedKw = escapeRegex(keyword);
+      const regex = new RegExp(`(${escapedKw})`, "gi");
+      return escapeHtml(text).replace(regex, `<mark class="search-highlight">$1</mark>`);
+    } catch (e) {
+      return escapeHtml(text);
+    }
+  }
+
+  function escapeRegex(string) {
+    return String(string).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function removeVietnameseTones(str) {
+    if (!str) return "";
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+  }
+
+  function updateSummaryText(count, query, tagObj) {
+    if (!searchSummaryText) return;
+
+    let clearTagBtn = "";
+    if (tagObj) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("tag");
+      clearTagBtn = `<a href="${cleanUrl.toString()}" class="tag-clear-btn" title="Bỏ lọc theo thẻ này">✕</a>`;
+    }
+
+    if (tagObj && query) {
+      searchSummaryText.innerHTML = `Tìm thấy <strong>${count}</strong> bài viết gắn thẻ <span class="tag-chip tag-chip--active" style="display:inline-flex; align-items:center;">#${escapeHtml(tagObj.name)}${clearTagBtn}</span> với từ khóa "<strong>${escapeHtml(query)}</strong>"`;
+    } else if (tagObj) {
+      searchSummaryText.innerHTML = `Tìm thấy <strong>${count}</strong> bài viết gắn thẻ <span class="tag-chip tag-chip--active" style="display:inline-flex; align-items:center;">#${escapeHtml(tagObj.name)}${clearTagBtn}</span>`;
+    } else if (query) {
+      searchSummaryText.innerHTML = `Tìm thấy <strong>${count}</strong> kết quả cho từ khóa "<strong>${escapeHtml(query)}</strong>"`;
+    } else {
+      searchSummaryText.innerHTML = `Hiển thị <strong>${count}</strong> bài viết`;
+    }
+  }
+
+  function setupCategoryOptions() {
+    if (!categoryFilter) return;
+    categories.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      if (String(c.id) === String(selectedCategory)) opt.selected = true;
+      categoryFilter.appendChild(opt);
+    });
+  }
+
+  function highlightActiveTagChips(activeTagObj) {
+    const allTagChips = document.querySelectorAll(".tag-chip[data-slug]");
+    allTagChips.forEach((chip) => {
+      if (activeTagObj && chip.getAttribute("data-slug") === activeTagObj.slug) {
+        chip.classList.add("tag-chip--active");
+      } else {
+        chip.classList.remove("tag-chip--active");
+      }
+    });
+  }
+
+  function renderHotTags() {
+    if (!hotTagsMount) return;
+    const hotTags = tags.slice(0, 6);
+    hotTagsMount.innerHTML = hotTags
+      .map((t) => {
+        const isActive = tagParam && (t.slug === tagParam || t.name.toLowerCase() === tagParam.toLowerCase());
+        return `<a href="search.html?tag=${t.slug}" class="tag-chip ${isActive ? 'tag-chip--active' : ''}" data-slug="${t.slug}" style="font-size: 12px;">#${escapeHtml(t.name)}</a>`;
+      })
+      .join("");
+  }
+}
+
+// Khởi chạy an toàn khi trang đã sẵn sàng
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initSearchPage);
+} else {
+  initSearchPage();
+}

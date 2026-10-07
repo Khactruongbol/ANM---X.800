@@ -1,0 +1,39 @@
+# Chỉ track workflow chính trong docs
+docs/*
+!docs/
+!docs/Workflow*
+
+# Không track tài liệu tham khảo/ghi chú sinh thêm
+references/
+
+# Không track file runtime/log thực tế, chỉ giữ .gitkeep
+logs/**/*.log
+logs/**/*.txt
+!logs/**/.gitkeep
+evidence/screenshots/*
+evidence/wireshark/*
+evidence/test-results/*
+!evidence/**/.gitkeep
+
+# Không track chứng thư/khóa thật, chỉ giữ khung thư mục
+certs/*
+!certs/.gitkeep
+*.key
+*.crt
+*.pem
+
+# Hệ điều hành / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+
+# Runtime/dependency phổ biến
+node_modules/
+vendor/
+*.log
+*.tmp
+*.bak
+
+# Nested git từ source copy
+app/website-tin-tuc/.git/
