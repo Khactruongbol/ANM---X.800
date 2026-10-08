@@ -183,23 +183,6 @@ Apache/Nginx + PHP + MySQL + website-tin-tuc
 [ ] Có bảng ánh xạ X.800 cuối cùng
 ```
 
-## Phạm vi git
-
-Repo này chỉ đưa lên:
-
-- Source website.
-- Bộ khung thư mục đồ án.
-- Workflow chính trong `docs/Workflow đề tài 2.md`.
-
-Repo này không đưa lên:
-
-- Prompt AI.
-- Tài liệu nháp.
-- Tài liệu tham khảo cục bộ.
-- Log runtime.
-- Chứng thư/khóa thật.
-- Bằng chứng kiểm thử phát sinh.
-
 ## Ghi chú an toàn
 
 Các kiểm thử trong đồ án chỉ dùng trong môi trường lab do nhóm kiểm soát. Không dùng các kịch bản kiểm thử để tấn công hệ thống thật hoặc hệ thống không thuộc quyền quản lý của nhóm.
