@@ -21,10 +21,16 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../helpers/response.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/csrf.php';
 require_once __DIR__ . '/../helpers/file.php';
+require_once __DIR__ . '/../helpers/rate_limit.php';
 
 // Xác thực bắt buộc: Người dùng phải đăng nhập trước khi thực hiện thao tác tệp
 requireLogin();
+requireCsrfForMutation();
+if (!consumeActionRateLimit($pdo, 'upload', (string)$_SESSION['user_id'], 20, 600)) {
+    jsonResponse(false, null, "Tải tệp tạm thời bị giới hạn");
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -137,10 +143,10 @@ if ($type === 'avatar') {
 
 // Tự động khởi tạo thư mục lưu trữ nếu chưa tồn tại
 if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0777, true);
+    mkdir($uploadDir, 0750, true);
 }
 
-$fileName = $type . '_' . uniqid() . '_' . time() . '.' . $extension;
+$fileName = $type . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
 $targetPath = $uploadDir . $fileName;
 
 // ==============================================================================
@@ -152,6 +158,17 @@ if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
 
 // Đường dẫn tương đối chuẩn để lưu vào cơ sở dữ liệu và hiển thị trên giao diện
 $imageUrl = $dbPathPrefix . $fileName;
+
+writeAuditLog(
+    'file_uploaded',
+    'file',
+    $fileName,
+    [
+        'type' => $type,
+        'mime' => $mimeType,
+        'size' => (int) $file['size'],
+    ]
+);
 
 jsonResponse(
     true,

@@ -110,6 +110,7 @@ try {
     ], "Lấy dữ liệu bảng điều khiển phóng viên thành công");
 
 } catch (PDOException $e) {
-    jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+    error_log('Reporter dashboard failed: ' . $e->getMessage());
+    jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
 }
 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audit log - Quản trị | Mạch Tin</title>
+  <link rel="stylesheet" href="../assets/css/base.css">
+  <link rel="stylesheet" href="../assets/css/admin-layout.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+</head>
+<body>
+  <div class="admin-workspace">
+    <aside id="admin-sidebar"></aside>
+    <div class="admin-main">
+      <header id="admin-topbar"></header>
+      <main class="admin-content">
+        <div class="admin-page-header">
+          <h1 class="admin-page-title">Audit log</h1>
+          <p class="admin-page-subtitle">Theo dõi sự kiện xác thực, phân quyền và thay đổi dữ liệu trong hệ thống.</p>
+        </div>
+        <div id="workspace-content"></div>
+      </main>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script src="../assets/js/admin-layout.js"></script>
+  <script src="../assets/js/admin-audit-logs.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => initAdminLayout("admin", "audit-logs"));
+  </script>
+</body>
+</html>

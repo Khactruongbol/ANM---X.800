@@ -27,12 +27,15 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/string.php';
+require_once __DIR__ . '/../../helpers/content_sanitizer.php';
 
 // Chỉ phóng viên (reporter) mới được tạo/sửa bài viết
 requireRole(['reporter']);
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 $authorId = (int) $_SESSION['user_id'];
 
 // ==============================================================================
@@ -71,7 +74,8 @@ if ($method === 'GET') {
 
         jsonResponse(true, $article);
     } catch (PDOException $e) {
-        jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+        error_log('Reporter article read failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 
@@ -91,11 +95,14 @@ if (!is_array($input)) {
 $targetId = isset($input['id']) && (int)$input['id'] > 0 ? (int)$input['id'] : 0;
 $title = isset($input['title']) ? trim($input['title']) : '';
 $shortDescription = isset($input['short_description']) ? trim($input['short_description']) : '';
-$content = isset($input['content']) ? trim($input['content']) : '';
+$content = isset($input['content']) ? sanitizeArticleHtml($input['content']) : '';
 $rawCoverImage = isset($input['cover_image']) ? trim($input['cover_image']) : '';
 $categoryId = isset($input['category_id']) ? (int) $input['category_id'] : 0;
 $status = isset($input['status']) ? trim($input['status']) : 'draft';
 $tags = isset($input['tags']) && is_array($input['tags']) ? $input['tags'] : [];
+$title = mb_substr(strip_tags($title), 0, 220, 'UTF-8');
+$shortDescription = mb_substr(strip_tags($shortDescription), 0, 500, 'UTF-8');
+$tags = array_slice(array_values(array_unique(array_map(static fn($tag) => mb_substr(strip_tags(trim((string)$tag)), 0, 60, 'UTF-8'), $tags))), 0, 12);
 
 /**
  * Hàm hỗ trợ: Chuẩn hóa đường dẫn tương đối của ảnh bìa
@@ -266,6 +273,10 @@ try {
 
     $pdo->commit();
 
+    if ($status === 'pending') {
+        writeAuditLog('article_submitted', 'article', $articleId, 'reporter_submitted_article');
+    }
+
     jsonResponse(
         true,
         [
@@ -283,6 +294,7 @@ try {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+    error_log('Reporter article write failed: ' . $e->getMessage());
+    jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
 }
 

@@ -28,12 +28,14 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/string.php';
 
 // Kiểm tra quyền hạn: Chỉ Biên tập viên (editor) mới được quản lý chuyên mục và tag
 requireRole(['editor']);
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 $type = $_GET['type'] ?? 'categories';
 
 if ($type !== 'categories' && $type !== 'tags') {
@@ -89,7 +91,8 @@ if ($method === 'GET') {
             jsonResponse(true, $tags, "Lấy danh sách tag thành công");
         }
     } catch (PDOException $e) {
-        jsonResponse(false, null, "Không thể lấy dữ liệu: " . $e->getMessage());
+        error_log('Editor categories/tags read failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 
@@ -197,7 +200,8 @@ if ($method === 'POST') {
             jsonResponse(true, $result, "Thêm tag thành công");
         }
     } catch (PDOException $e) {
-        jsonResponse(false, null, "Không thể thêm dữ liệu: " . $e->getMessage());
+        error_log('Editor categories/tags create failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 
@@ -342,7 +346,8 @@ if ($method === 'PUT') {
                     ], "Đã gộp thẻ tag thành công vào thẻ '#{$targetName}'!");
                 } catch (Exception $e) {
                     $pdo->rollBack();
-                    jsonResponse(false, null, "Không thể gộp thẻ tag: " . $e->getMessage());
+                    error_log('Editor tag merge failed: ' . $e->getMessage());
+                    jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
                 }
             }
 
@@ -367,7 +372,8 @@ if ($method === 'PUT') {
             jsonResponse(true, $result, "Cập nhật tag thành công");
         }
     } catch (PDOException $e) {
-        jsonResponse(false, null, "Không thể cập nhật dữ liệu: " . $e->getMessage());
+        error_log('Editor categories/tags update failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 
@@ -447,7 +453,8 @@ if ($method === 'DELETE') {
             jsonResponse(true, null, "Xóa tag thành công");
         }
     } catch (PDOException $e) {
-        jsonResponse(false, null, "Không thể xóa dữ liệu: " . $e->getMessage());
+        error_log('Editor categories/tags delete failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 

@@ -24,12 +24,14 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 // Yêu cầu đăng nhập trước khi đổi mật khẩu
 requireLogin();
 
 $userId = $_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // KHỐI 1: KIỂM TRA PHƯƠNG THỨC HTTP
@@ -88,6 +90,8 @@ try {
         $newPasswordHash,
         $userId
     ]);
+
+    writeAuditLog('password_changed', 'user', $userId, 'password_updated');
 
     // ==============================================================================
     // KHỐI 4: PHẢN HỒI KẾT QUẢ CHO CLIENT

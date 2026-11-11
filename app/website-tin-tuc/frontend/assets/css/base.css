@@ -32,9 +32,9 @@
   --green: #40672F;         /* Màu xanh lá cho trạng thái hoạt động/đã nộp */
 
   /* Font chữ */
-  --f-display: 'Fraunces', 'Times New Roman', serif;
-  --f-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --f-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --f-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --f-body: 'Inter', Arial, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: 'IBM Plex Mono', Consolas, 'Courier New', monospace;
 
   /* Kích thước & Bo góc */
   --maxw: 1200px;

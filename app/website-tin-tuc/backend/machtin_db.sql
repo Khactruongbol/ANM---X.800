@@ -7,6 +7,11 @@
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
+CREATE DATABASE IF NOT EXISTS `machtin_db`
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+USE `machtin_db`;
+
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
@@ -515,6 +520,68 @@ ALTER TABLE `favorites`
   ADD CONSTRAINT `favorites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `favorites_ibfk_2` FOREIGN KEY (`article_id`) REFERENCES `articles` (`id`) ON DELETE CASCADE;
 COMMIT;
+
+-- Các bảng bảo mật bổ sung để import một lần trên XAMPP.
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    account VARCHAR(255) NOT NULL,
+    ip_address VARCHAR(64) NOT NULL,
+    failed_count INT NOT NULL DEFAULT 0,
+    first_failed_at DATETIME NOT NULL,
+    last_failed_at DATETIME NOT NULL,
+    blocked_until DATETIME NULL,
+    UNIQUE KEY uniq_account_ip (account, ip_address),
+    KEY idx_blocked_until (blocked_until),
+    KEY idx_last_failed_at (last_failed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
+    username VARCHAR(100) NULL,
+    role VARCHAR(50) NULL,
+    action VARCHAR(100) NOT NULL,
+    target_type VARCHAR(100) NULL,
+    target_id VARCHAR(100) NULL,
+    ip_address VARCHAR(64) NULL,
+    user_agent TEXT NULL,
+    detail TEXT NULL,
+    previous_hash CHAR(64) NULL,
+    current_hash CHAR(64) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_audit_action (action),
+    KEY idx_audit_user_id (user_id),
+    KEY idx_audit_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_rate_limits (
+    action_key VARCHAR(80) NOT NULL,
+    subject_key VARCHAR(190) NOT NULL,
+    window_started DATETIME NOT NULL,
+    request_count INT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (action_key, subject_key, window_started),
+    KEY idx_action_rate_updated_at (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS external_articles (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    source_key VARCHAR(80) NOT NULL,
+    source_name VARCHAR(120) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    summary TEXT NULL,
+    original_url VARCHAR(2048) NOT NULL,
+    canonical_url VARCHAR(2048) NULL,
+    published_at DATETIME NULL,
+    fetched_at DATETIME NOT NULL,
+    content_hash CHAR(64) NOT NULL,
+    status ENUM('pending', 'approved', 'hidden', 'expired') NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_external_source_hash (source_key, content_hash),
+    KEY idx_external_status_published (status, published_at),
+    KEY idx_external_source_fetched (source_key, fetched_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

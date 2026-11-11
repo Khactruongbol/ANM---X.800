@@ -27,12 +27,14 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/file.php';
 
 // Chỉ phóng viên (reporter) mới được truy cập
 requireRole(['reporter']);
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 $userId = $_SESSION['user_id'];
 
 try {
@@ -92,7 +94,8 @@ try {
         }
 
         if ($action === 'withdraw') {
-            $pdo->prepare("UPDATE articles SET status = 'draft', updated_at = NOW() WHERE id = ?")->execute([$articleId]);
+            $pdo->prepare("UPDATE articles SET status = 'draft', updated_at = NOW() WHERE id = ? AND author_id = ?")
+                ->execute([$articleId, $userId]);
             jsonResponse(true, null, "Đã thu hồi bài viết về bản nháp");
         } else if ($action === 'submit') {
             if (empty(trim($art['title'] ?? '')) || empty(trim($art['content'] ?? '')) || empty($art['category_id'])) {
@@ -152,7 +155,7 @@ try {
 
         // Nhờ ON DELETE CASCADE trong database, xóa articles sẽ tự động xóa
         // các liên kết trong article_tags, comments và favorites
-        $pdo->prepare("DELETE FROM articles WHERE id = ?")->execute([$articleId]);
+        $pdo->prepare("DELETE FROM articles WHERE id = ? AND author_id = ?")->execute([$articleId, $userId]);
 
         jsonResponse(true, null, "Đã xóa bài viết thành công");
     }

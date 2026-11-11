@@ -21,6 +21,7 @@
 require_once '../../config/database.php';
 require_once '../../helpers/response.php';
 require_once '../../helpers/auth.php';
+require_once '../../helpers/csrf.php';
 
 // ==============================================================================
 // KHỐI 1: KIỂM TRA PHƯƠNG THỨC HTTP
@@ -29,10 +30,12 @@ require_once '../../helpers/auth.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, null, "Phương thức không được hỗ trợ");
 }
+requireCsrfForMutation();
 
 // ==============================================================================
 // KHỐI 2: HỦY DỮ LIỆU PHIÊN (SESSION) VÀ XÓA COOKIE TRÊN TRÌNH DUYỆT
 // ==============================================================================
+writeAuditLog('logout', 'authentication', $_SESSION['user_id'] ?? null, 'session_destroyed');
 $_SESSION = [];
 
 if (ini_get("session.use_cookies")) {
@@ -40,11 +43,14 @@ if (ini_get("session.use_cookies")) {
     setcookie(
         session_name(),
         '',
-        time() - 42000,
-        $params["path"],
-        $params["domain"],
-        $params["secure"],
-        $params["httponly"]
+        [
+            'expires' => time() - 42000,
+            'path' => $params['path'] ?? '/',
+            'domain' => $params['domain'] ?? '',
+            'secure' => (bool) ($params['secure'] ?? false),
+            'httponly' => (bool) ($params['httponly'] ?? true),
+            'samesite' => $params['samesite'] ?? 'Lax',
+        ]
     );
 }
 

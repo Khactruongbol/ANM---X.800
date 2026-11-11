@@ -26,8 +26,10 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // NGHIỆP VỤ 1: GET - LẤY DANH SÁCH TOÀN BỘ NGƯỜI DÙNG TRONG HỆ THỐNG
@@ -133,6 +135,9 @@ if ($method === 'PUT') {
         }
         $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
         $stmt->execute([$input['role'], $userId]);
+        writeAuditLog('role_changed', 'user', $userId, [
+            'new_role' => $input['role'],
+        ]);
     }
 
     // Cập nhật trạng thái khóa hoặc mở khóa tài khoản
@@ -140,9 +145,11 @@ if ($method === 'PUT') {
         if ($input['status'] === 'locked') {
             $stmt = $pdo->prepare("UPDATE users SET status='locked', lock_reason=?, locked_at=NOW() WHERE id=?");
             $stmt->execute([$input['lock_reason'] ?? 'Vi phạm điều khoản cộng đồng', $userId]);
+            writeAuditLog('user_locked', 'user', $userId, 'admin_locked_user');
         } else {
             $stmt = $pdo->prepare("UPDATE users SET status='active', lock_reason=NULL, locked_at=NULL WHERE id=?");
             $stmt->execute([$userId]);
+            writeAuditLog('user_unlocked', 'user', $userId, 'admin_unlocked_user');
         }
     }
 

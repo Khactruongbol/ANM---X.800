@@ -27,13 +27,16 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/file.php';
 require_once __DIR__ . '/../../helpers/string.php';
+require_once __DIR__ . '/../../helpers/content_sanitizer.php';
 
 // Kiểm tra quyền hạn: Chỉ Quản trị viên (admin) mới được truy cập
 requireRole(['admin']);
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // NGHIỆP VỤ 1: GET - TRUY VẤN DANH SÁCH BÀI VIẾT ĐÃ XUẤT BẢN / ĐANG BỊ ẨN
@@ -159,6 +162,16 @@ if ($method === 'PUT') {
     }
 
     // Nhánh 2.2: Cập nhật toàn bộ thông tin chi tiết bài viết (Bao gồm Thẻ Tag)
+    $allowedStatuses = ['published', 'hidden'];
+    if (!isset($input['status']) || !in_array($input['status'], $allowedStatuses, true)) {
+        jsonResponse(false, null, "Trạng thái bài viết không hợp lệ");
+    }
+    if (!isset($input['title']) || trim((string)$input['title']) === '') {
+        jsonResponse(false, null, "Tiêu đề không được để trống");
+    }
+    $input['title'] = mb_substr(strip_tags((string)$input['title']), 0, 220, 'UTF-8');
+    $input['short_description'] = mb_substr(strip_tags((string)($input['short_description'] ?? '')), 0, 500, 'UTF-8');
+    $input['content'] = sanitizeArticleHtml((string)($input['content'] ?? ''));
     $pdo->beginTransaction();
     try {
         $stmt = $pdo->prepare(
@@ -210,7 +223,8 @@ if ($method === 'PUT') {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        jsonResponse(false, null, "Lỗi cập nhật bài viết: " . $e->getMessage());
+        error_log('Admin article update failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
     }
 }
 

@@ -20,6 +20,28 @@
  * ==============================================================================
  */
 
+function sanitizeArticleHtmlForRender(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(String(html || ""), "text/html");
+  doc.querySelectorAll("script, style, object, embed, form, svg, math").forEach((node) => node.remove());
+  doc.querySelectorAll("*").forEach((node) => {
+    [...node.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      if (name.startsWith("on") || /^(javascript|vbscript|data:text):/i.test(value)) node.removeAttribute(attribute.name);
+    });
+    ["href", "src"].forEach((attributeName) => {
+      const value = node.getAttribute(attributeName);
+      if (value && /^(javascript|vbscript|data:text):/i.test(value.trim())) node.removeAttribute(attributeName);
+    });
+    if (node.tagName.toLowerCase() === "iframe") {
+      const src = node.getAttribute("src") || "";
+      if (!/^https:\/\/(?:www\.)?(?:youtube\.com|player\.vimeo\.com)\//i.test(src)) node.remove();
+    }
+  });
+  return doc.body.innerHTML;
+}
+
 async function initArticleDetailPage() {
   // ==============================================================================
   // KHỐI 1: TẢI CHI TIẾT BÀI VIẾT & KHỞI TẠO KHUNG TRANG (HEADER / FOOTER)
@@ -125,7 +147,7 @@ async function initArticleDetailPage() {
           }
           return match;
         });
-        contentContainer.innerHTML = processedHtml;
+        contentContainer.innerHTML = sanitizeArticleHtmlForRender(processedHtml);
       } else {
         contentContainer.innerHTML = rawContent
           .split(/\n\n+/)

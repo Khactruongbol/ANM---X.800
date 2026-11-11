@@ -33,5 +33,8 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec("SET time_zone = '+07:00'");
 } catch (PDOException $e) {
-    die(json_encode(["success" => false, "message" => "Kết nối thất bại: " . $e->getMessage()]));
+    error_log('Database connection failed: ' . $e->getMessage());
+    header('Content-Type: application/json');
+    http_response_code(503);
+    die(json_encode(["success" => false, "message" => "Dịch vụ tạm thời không khả dụng"]));
 }

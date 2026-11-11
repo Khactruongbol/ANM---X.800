@@ -34,6 +34,12 @@ vendor/
 *.log
 *.tmp
 *.bak
+app/website-tin-tuc/backend/runtime/*
+!app/website-tin-tuc/backend/runtime/.gitkeep
 
 # Nested git từ source copy
 app/website-tin-tuc/.git/
+
+# Codex presentation build intermediates
+.codex-finalizer/
+.codex-presentation-build/
