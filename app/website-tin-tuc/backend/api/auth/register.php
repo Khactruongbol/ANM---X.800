@@ -25,12 +25,19 @@
 
 require_once '../../config/database.php';
 require_once '../../helpers/response.php';
+require_once '../../helpers/auth.php';
+require_once '../../helpers/csrf.php';
+require_once '../../helpers/rate_limit.php';
 
 // ==============================================================================
 // KHỐI 1: KIỂM TRA PHƯƠNG THỨC HTTP
 // ==============================================================================
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, null, "Phương thức không được hỗ trợ");
+}
+requireCsrfForMutation();
+if (!consumeActionRateLimit($pdo, 'register', getClientIpAddress(), 5, 600)) {
+    jsonResponse(false, null, "Đăng ký tạm thời bị giới hạn, vui lòng thử lại sau");
 }
 
 // ==============================================================================

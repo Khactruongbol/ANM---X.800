@@ -3,7 +3,7 @@
 TÊN FILE: frontend/public/index.html
 PHÂN HỆ: Trang Chủ Công Khai (Public Homepage View)
 MÔ TẢ: Khung giao diện trang chủ Báo Điện Tử Mạch Tin:
-       - Vùng gắn Header & Ticker tự động (#site-header).
+       - Vùng gắn Header & điều hướng tự động (#site-header).
        - Khối Hero Grid: Tin bài tiêu điểm trang nhất (#hero-mount).
        - Khối Tin mới cập nhật (#latest-mount).
        - Khối Sự kiện đáng chú ý (#stream-mount) & Cột đọc nhiều / Tag nổi bật (#rank-mount, #tag-mount).
@@ -18,7 +18,7 @@ PHỤ THUỘC:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mạch Tin - Bắt mạch dòng chảy tin tức 24/7</title>
+  <title>Mạch Tin - Tin tức nội bộ đã biên tập</title>
   
   <!-- CSS Nền tảng & Layout Công khai -->
   <link rel="stylesheet" href="../assets/css/base.css">
@@ -78,6 +78,13 @@ PHỤ THUỘC:
           </div>
         </aside>
       </div>
+
+      <section class="local-content-note" aria-label="Phạm vi nội dung">
+        <span class="local-content-note__eyebrow">TÒA SOẠN MẠCH TIN</span>
+        <h2>Nội dung được chọn lọc và lưu trữ ngay trong hệ thống</h2>
+        <p>Trang chủ chỉ sử dụng các bài viết nội bộ đã được biên tập, giúp trải nghiệm ổn định trên máy local và không phụ thuộc API hay nguồn tin bên ngoài.</p>
+        <a href="category.html?filter=latest" class="see-all">KHÁM PHÁ KHO BÀI VIẾT →</a>
+      </section>
     </div>
   </main>
 

@@ -26,8 +26,10 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // NGHIỆP VỤ 1: GET - ĐỌC THÔNG TIN CẤU HÌNH TÒA SOẠN (CÔNG KHAI)

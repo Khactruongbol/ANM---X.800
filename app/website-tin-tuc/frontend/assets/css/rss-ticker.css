@@ -1,0 +1,48 @@
+.rss-ticker {
+  position: relative;
+  width: min(100% - 32px, var(--maxw));
+  margin: 20px auto 28px;
+  padding: 16px 72px 18px 20px;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--paper-alt), var(--white));
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brass);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(19, 27, 46, .06);
+}
+.rss-ticker__header { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.rss-ticker--reference { margin-top: 42px; border-left-color: var(--ink); }
+.rss-ticker__heading { margin: 7px 0 4px; color: var(--ink); font: 700 clamp(22px, 3vw, 32px)/1.15 var(--f-display); }
+.rss-ticker__description { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.rss-ticker__actions { display:flex; align-items:center; gap:12px; margin-left:auto; }
+.rss-ticker__label { color:var(--crimson); font:700 12px/1 var(--f-mono); letter-spacing:.08em; }
+.rss-ticker__status { color:var(--muted); font-size:12px; }
+.rss-ticker__viewport { overflow:hidden; min-height:108px; }
+.rss-ticker__track { display:flex; transition:transform .28s ease; }
+.rss-ticker__slide { flex:0 0 100%; min-width:0; }
+.rss-ticker__source { color:var(--brass-dark); font:600 12px/1.4 var(--f-mono); }
+.rss-ticker__title { display:block; margin:6px 0; color:var(--ink); font:600 clamp(18px, 2vw, 24px)/1.2 var(--f-display); text-decoration:none; }
+.rss-ticker__title:hover { color:var(--crimson); }
+.rss-ticker__summary { max-width:850px; margin:0; color:var(--ink-soft); font-size:14px; line-height:1.55; }
+.rss-ticker__meta { margin-top:9px; color:var(--muted); font-size:12px; }
+.rss-ticker__control { position:absolute; top:50%; width:36px; height:36px; border:1px solid var(--line); border-radius:50%; color:var(--ink); background:var(--white); font-size:25px; line-height:1; transform:translateY(-25%); cursor:pointer; }
+.rss-ticker__control:hover { color:var(--white); background:var(--ink); }
+.rss-ticker__control:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.rss-ticker__control--prev { right:54px; }
+.rss-ticker__control--next { right:14px; }
+.rss-ticker__refresh { margin-left:auto; border:0; color:var(--brass-dark); background:transparent; font:600 12px var(--f-body); cursor:pointer; }
+.rss-ticker__refresh:focus-visible { outline:3px solid var(--brass); outline-offset:3px; }
+.rss-ticker.is-error .rss-ticker__status { color:var(--crimson); }
+@media (max-width: 640px) {
+  .rss-ticker { width:calc(100% - 24px); padding:14px 58px 16px 14px; }
+  .rss-ticker__header { align-items:flex-start; flex-direction:column; }
+  .rss-ticker__actions { width:100%; margin-left:0; justify-content:space-between; }
+  .rss-ticker__viewport { min-height:145px; }
+  .rss-ticker__title { font-size:19px; }
+  .rss-ticker__control { width:32px; height:32px; font-size:22px; }
+  .rss-ticker__control--prev { right:48px; }
+  .rss-ticker__control--next { right:10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rss-ticker__track { transition:none; }
+}

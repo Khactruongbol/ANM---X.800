@@ -25,12 +25,14 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 // Bắt buộc đăng nhập trước khi thao tác danh sách yêu thích
 requireLogin();
 
 $userId = $_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 try {
     // ==============================================================================

@@ -107,6 +107,7 @@ try {
     ], "Lấy số liệu thống kê Dashboard Biên tập viên thành công");
 
 } catch (PDOException $e) {
-    jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+    error_log('Editor dashboard failed: ' . $e->getMessage());
+    jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
 }
 

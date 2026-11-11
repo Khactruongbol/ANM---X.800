@@ -100,7 +100,7 @@ app/website-tin-tuc/
 C:\xampp\htdocs\website-tin-tuc
 ```
 
-2. Import database:
+2. Import database (đã gộp cả các bảng bảo mật và bảng legacy external-news):
 
 ```text
 app/website-tin-tuc/backend/machtin_db.sql
@@ -116,6 +116,8 @@ app/website-tin-tuc/backend/config/database.php
 
 ```text
 http://localhost/website-tin-tuc/frontend/public/index.html
+
+Không cần Node.js, Composer, API key hoặc dịch vụ tin tức ngoài. Chỉ cần bật Apache và MySQL trong XAMPP, tạo database `machtin_db`, rồi import một file SQL duy nhất. Nếu dùng HTTPS local, bật SSL/VirtualHost theo `config/apache/xampp-vhost.conf`.
 ```
 
 5. Mở trang đăng nhập:
@@ -139,6 +141,12 @@ Workflow gồm các phần:
 - Bảng ánh xạ X.800.
 - Testcase và bằng chứng.
 - Phân công nhóm 3 người.
+
+Bộ tài liệu kiểm thử và thuyết trình cập nhật:
+
+- [Bộ testcase kiểm thử toàn bộ website](docs/testcases-full-website.md)
+- [Kế hoạch trình bày trước lớp](docs/presentation-plan.md)
+- [Kiểm tra mức độ đầy đủ và phần còn thiếu](docs/completeness-audit.md)
 
 ## Mô hình triển khai khuyến nghị
 

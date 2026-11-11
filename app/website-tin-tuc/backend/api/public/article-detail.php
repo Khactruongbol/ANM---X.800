@@ -24,6 +24,8 @@
 
 require_once '../../config/database.php';
 require_once '../../helpers/response.php';
+require_once '../../helpers/auth.php';
+require_once '../../helpers/content_sanitizer.php';
 
 // ==============================================================================
 // KHỐI 1: KIỂM TRA PHƯƠNG THỨC HTTP
@@ -71,10 +73,6 @@ try {
     // - Ngăn chặn tác giả tự tăng lượt xem bài của chính mình
     // - Chỉ tăng view nếu bài viết chưa từng được xem trong phiên hiện tại (chống F5)
     // ==============================================================================
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-
     if (!isset($_SESSION['viewed_articles']) || !is_array($_SESSION['viewed_articles'])) {
         $_SESSION['viewed_articles'] = [];
     }
@@ -116,7 +114,7 @@ try {
         "title" => $row['title'],
         "slug" => $row['slug'],
         "short_description" => $row['short_description'],
-        "content" => $row['content'],
+        "content" => sanitizeArticleHtml($row['content']),
         "cover_image" => $coverImage,
         "author_id" => $row['author_id'] !== null ? (int) $row['author_id'] : null,
         "category_id" => $row['category_id'] !== null ? (int) $row['category_id'] : null,

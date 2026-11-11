@@ -25,6 +25,8 @@
 require_once '../../config/database.php';
 require_once '../../helpers/response.php';
 require_once '../../helpers/auth.php';
+require_once '../../helpers/csrf.php';
+require_once '../../helpers/rate_limit.php';
 
 // ==============================================================================
 // KHỐI 1: KIỂM TRA PHƯƠNG THỨC HTTP
@@ -32,6 +34,7 @@ require_once '../../helpers/auth.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, null, "Phương thức không được hỗ trợ");
 }
+requireCsrfForMutation();
 
 // ==============================================================================
 // KHỐI 2: TIẾP NHẬN & KIỂM TRA DỮ LIỆU ĐẦU VÀO
@@ -44,15 +47,28 @@ if ($account === '' || $password === '') {
     jsonResponse(false, null, "Vui lòng nhập đầy đủ email/username và mật khẩu");
 }
 
+$ipAddress = getClientIpAddress();
+
 // ==============================================================================
 // KHỐI 3: TRUY VẤN TÀI KHOẢN & XÁC MINH MẬT KHẨU
 // ==============================================================================
 try {
+    if (isLoginRateLimited($pdo, $account, $ipAddress)) {
+        writeAuditLog('login_rate_limited', 'authentication', null, 'rate_limit_blocked');
+        jsonResponse(false, null, "Đăng nhập tạm thời bị giới hạn, vui lòng thử lại sau");
+    }
+
     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR username = ? LIMIT 1");
     $stmt->execute([$account, $account]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || !password_verify($password, $user['password'])) {
+        $attempt = recordFailedLogin($pdo, $account, $ipAddress);
+        if ($attempt['is_blocked']) {
+            writeAuditLog('login_rate_limited', 'authentication', null, 'threshold_reached');
+            jsonResponse(false, null, "Đăng nhập tạm thời bị giới hạn, vui lòng thử lại sau");
+        }
+        writeAuditLog('login_failed', 'authentication', null, 'invalid_account_or_password');
         jsonResponse(false, null, "Email/Username hoặc mật khẩu không chính xác");
     }
 
@@ -63,6 +79,8 @@ try {
         ], "Tài khoản này đã bị khóa quyền truy cập");
     }
 
+    resetLoginAttempts($pdo, $account, $ipAddress);
+
     // ==============================================================================
     // KHỐI 4: KHỞI TẠO PHIÊN LÀM VIỆC (SESSION)
     // - Tái tạo session ID (session_regenerate_id) để phòng chống tấn công Session Fixation
@@ -71,6 +89,9 @@ try {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $user['id'];
     $_SESSION['role'] = $user['role'];
+    $_SESSION['username'] = $user['username'];
+
+    writeAuditLog('login_success', 'user', $user['id'], 'authenticated');
 
     jsonResponse(true, [
         "id" => $user['id'],

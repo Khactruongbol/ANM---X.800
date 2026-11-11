@@ -25,6 +25,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/file.php';
 
 // Yêu cầu người dùng phải đăng nhập
@@ -32,6 +33,7 @@ requireLogin();
 
 $userId = $_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 try {
     // ==============================================================================
@@ -170,6 +172,9 @@ try {
             $userId
         ]);
 
+        $_SESSION['username'] = $username;
+        writeAuditLog('profile_updated', 'user', $userId, 'profile_updated');
+
         // Lấy lại thông tin mới nhất sau khi cập nhật
         $stmt = $pdo->prepare("
             SELECT
@@ -201,6 +206,7 @@ try {
     jsonResponse(false, null, "Phương thức không được hỗ trợ");
 
 } catch (PDOException $e) {
-    jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+    error_log('Profile update failed: ' . $e->getMessage());
+    jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
 }
 

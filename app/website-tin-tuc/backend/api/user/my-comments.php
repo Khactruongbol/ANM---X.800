@@ -26,12 +26,18 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/rate_limit.php';
 
 // Bắt buộc đăng nhập trước khi thực hiện bất kỳ thao tác bình luận nào
 requireLogin();
 
 $userId = $_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
+if ($method !== 'GET' && !consumeActionRateLimit($pdo, 'comment_mutation', (string)$userId, 20, 300)) {
+    jsonResponse(false, null, "Thao tác bình luận tạm thời bị giới hạn");
+}
 
 try {
     // ==============================================================================
@@ -134,13 +140,13 @@ try {
             jsonResponse(false, null, "Không tìm thấy bình luận");
         }
 
-        if ($comment['user_id'] != $userId) {
+        if ((int) $comment['user_id'] !== (int) $userId) {
             jsonResponse(false, null, "Bạn không có quyền chỉnh sửa bình luận này");
         }
 
         // Cập nhật nội dung bình luận
-        $stmt = $pdo->prepare("UPDATE comments SET content = ? WHERE id = ?");
-        $stmt->execute([$content, $commentId]);
+        $stmt = $pdo->prepare("UPDATE comments SET content = ? WHERE id = ? AND user_id = ?");
+        $stmt->execute([$content, $commentId, $userId]);
 
         jsonResponse(true, null, "Chỉnh sửa bình luận thành công");
     }
@@ -170,7 +176,7 @@ try {
             jsonResponse(false, null, "Không tìm thấy bình luận");
         }
 
-        if ($comment['user_id'] != $userId) {
+        if ((int) $comment['user_id'] !== (int) $userId) {
             jsonResponse(false, null, "Bạn không có quyền xóa bình luận này");
         }
 
@@ -185,6 +191,7 @@ try {
     jsonResponse(false, null, "Phương thức không được hỗ trợ");
 
 } catch (PDOException $e) {
-    jsonResponse(false, null, "Lỗi hệ thống: " . $e->getMessage());
+        error_log('Comment operation failed: ' . $e->getMessage());
+        jsonResponse(false, null, "Lỗi hệ thống, vui lòng thử lại sau");
 }
 

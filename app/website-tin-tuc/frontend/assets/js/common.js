@@ -86,6 +86,75 @@ async function safeFetchJson(url, options) {
 }
 window.safeFetchJson = safeFetchJson;
 
+// =============================================================================
+// CSRF & SECURE FETCH
+// =============================================================================
+// Backend yêu cầu X-CSRF-Token cho POST/PUT/PATCH/DELETE. Giữ một native fetch
+// riêng để việc lấy token không tự gọi lại secureFetch gây vòng lặp.
+const __machtinNativeFetch = window.__machtinNativeFetch || window.fetch.bind(window);
+window.__machtinNativeFetch = __machtinNativeFetch;
+let __machtinCsrfToken = null;
+let __machtinCsrfTokenPromise = null;
+
+async function getCsrfToken() {
+  if (__machtinCsrfToken) return __machtinCsrfToken;
+  if (__machtinCsrfTokenPromise) return __machtinCsrfTokenPromise;
+
+  __machtinCsrfTokenPromise = __machtinNativeFetch(
+    resolveApiUrl("auth/csrf.php"),
+    { method: "GET", credentials: "include" }
+  )
+    .then((res) => res.text())
+    .then((text) => safeJsonParse(text))
+    .then((payload) => {
+      __machtinCsrfToken = payload && payload.success && payload.data
+        ? payload.data.csrf_token
+        : null;
+      return __machtinCsrfToken;
+    })
+    .catch(() => null)
+    .finally(() => {
+      __machtinCsrfTokenPromise = null;
+    });
+
+  return __machtinCsrfTokenPromise;
+}
+window.getCsrfToken = getCsrfToken;
+
+async function secureFetch(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(method)) {
+    return __machtinNativeFetch(url, options);
+  }
+
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("X-CSRF-Token")) {
+    const token = await getCsrfToken();
+    if (token) headers.set("X-CSRF-Token", token);
+  }
+
+  return __machtinNativeFetch(url, {
+    ...options,
+    headers,
+    credentials: options.credentials || "include",
+  });
+}
+window.secureFetch = secureFetch;
+
+// Tự động bảo vệ các lời gọi API hiện có trong các màn hình cũ. Các request
+// public GET và request ngoài backend không bị thay đổi.
+window.fetch = function (url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const target = String(url);
+  const isBackendApi = target.includes("backend/api/");
+  const isMutation = !["GET", "HEAD", "OPTIONS"].includes(method);
+
+  if (isBackendApi && isMutation && !target.includes("/auth/csrf.php")) {
+    return secureFetch(url, options);
+  }
+  return __machtinNativeFetch(url, options);
+};
+
 // Cache trong bộ nhớ (chỉ tồn tại trong 1 lần tải trang) để tránh gọi lại me.php
 // nhiều lần khi nhiều đoạn code trên cùng 1 trang đều gọi getCurrentUser().
 let __machtinCurrentUserCache = undefined;

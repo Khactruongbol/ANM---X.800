@@ -26,11 +26,13 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 // Kiểm tra quyền hạn: Chỉ Biên tập viên (editor) mới được thẩm định bài viết
 requireRole(['editor']);
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // NGHIỆP VỤ 1: GET - LẤY DANH SÁCH BÀI VIẾT CHỜ DUYỆT KÈM TAGS VÀ TÁC GIẢ
@@ -86,7 +88,7 @@ if ($method === 'GET') {
         jsonResponse(
             false,
             null,
-            "Không thể lấy danh sách bài viết: " . $e->getMessage()
+            "Lỗi hệ thống, vui lòng thử lại sau"
         );
     }
 }
@@ -167,6 +169,8 @@ if ($method === 'PUT') {
             $resultStmt->execute([$articleId]);
             $result = $resultStmt->fetch(PDO::FETCH_ASSOC);
 
+            writeAuditLog('article_approved', 'article', $articleId, 'editor_approved_article');
+
             jsonResponse(
                 true,
                 $result,
@@ -205,6 +209,10 @@ if ($method === 'PUT') {
 
             $resultStmt->execute([$articleId]);
             $result = $resultStmt->fetch(PDO::FETCH_ASSOC);
+
+            writeAuditLog('article_rejected', 'article', $articleId, [
+                'reason_provided' => true,
+            ]);
 
             jsonResponse(
                 true,

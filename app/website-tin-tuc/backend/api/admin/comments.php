@@ -26,8 +26,10 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
+requireCsrfForMutation();
 
 // ==============================================================================
 // NGHIỆP VỤ 1: GET - LẤY TOÀN BỘ BÌNH LUẬN TRONG HỆ THỐNG KÈM BÀI VIẾT & TÁC GIẢ (HỖ TRỢ PHÂN TRANG)
