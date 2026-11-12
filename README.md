@@ -115,7 +115,7 @@ app/website-tin-tuc/backend/config/database.php
 4. Mở trang public:
 
 ```text
-http://localhost/website-tin-tuc/frontend/public/index.html
+https://localhost/frontend/public/index.html
 
 Không cần Node.js, Composer, API key hoặc dịch vụ tin tức ngoài. Chỉ cần bật Apache và MySQL trong XAMPP, tạo database `machtin_db`, rồi import một file SQL duy nhất. Nếu dùng HTTPS local, bật SSL/VirtualHost theo `config/apache/xampp-vhost.conf`.
 ```
@@ -123,8 +123,10 @@ Không cần Node.js, Composer, API key hoặc dịch vụ tin tức ngoài. Ch�
 5. Mở trang đăng nhập:
 
 ```text
-http://localhost/website-tin-tuc/frontend/public/login.html
+https://localhost/frontend/public/login.html
 ```
+
+VirtualHost hiện tại đặt document root tại `C:\xampp\htdocs\website-tin-tuc`, vì vậy không thêm `/website-tin-tuc` vào URL. Nếu chưa bật VirtualHost và chỉ dùng document root mặc định của XAMPP, dùng dạng `http://localhost/website-tin-tuc/frontend/public/index.html`.
 
 ## Workflow chính
 

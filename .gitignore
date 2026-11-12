@@ -43,3 +43,6 @@ app/website-tin-tuc/.git/
 # Codex presentation build intermediates
 .codex-finalizer/
 .codex-presentation-build/
+
+# Local presentation renders and temporary image variants
+tmp/
